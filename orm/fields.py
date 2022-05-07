@@ -1,0 +1,113 @@
+from copy import deepcopy
+
+from orm.commands import SQL
+
+__all__ = ["BooleanField", "IntegerField", "DefaultPrimaryKeyField", "CharField"]
+
+
+class BaseField:
+    def __deepcopy__(self, memodict):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        for k, v in self.__dict__.items():
+            setattr(result, k, deepcopy(v))
+        return result
+
+
+class Field(BaseField):
+
+    field_type = None
+
+    def __init__(
+        self,
+        verbose_name=None,
+        null=False,
+        unique=False,
+        primary_key=False,
+        default=None,
+        extra_sql=(),
+    ):
+        self.__value = None
+        self.verbose_name = verbose_name
+        self.primary_key = primary_key
+        if primary_key:
+            self.properties = "PRIMARY KEY"
+        else:
+            if default is not None:
+                if bool(default) is default:
+                    self.properties = "DEFAULT {}".format(
+                        "TRUE" if default else "FALSE"
+                    )
+                else:
+                    self.properties = "DEFAULT {}".format(default)
+            else:
+                self.properties = "NULL" if null else "NOT NULL"
+                if unique:
+                    self.properties = "UNIQUE " + self.properties
+        if extra_sql:
+            self.properties += " " + " ".join(extra_sql)
+        self.base_create_query = SQL.add_table_column()
+
+    @staticmethod
+    def convert(value):
+        return value
+
+    def create(self, schema, table_name, column_name):
+        query = self.base_create_query.format(
+            schema=schema,
+            table_name=table_name,
+            name=column_name,
+            field_type=self.field_type,
+            properties=self.properties,
+        )
+        return query
+
+    def set_value(self, value):
+        self.__value = value
+
+
+class BooleanField(Field):
+
+    field_type = "BOOLEAN"
+
+    @staticmethod
+    def convert(value):
+        return bool(value)
+
+
+class IntegerField(Field):
+
+    field_type = "INTEGER"
+
+    @staticmethod
+    def convert(value):
+        return int(value)
+
+
+class DefaultPrimaryKeyField(IntegerField):
+
+    field_type = "SERIAL"
+
+    def __init__(self, verbose_name=None):
+        super().__init__(verbose_name=verbose_name, primary_key=True)
+
+    @staticmethod
+    def convert(value):
+        return int(value)
+
+
+class CharField(Field):
+
+    field_type = "VARCHAR"
+
+    def __init__(
+        self, max_length, verbose_name=None, null=False, unique=False, default=None
+    ):
+        super().__init__(
+            verbose_name=verbose_name, null=null, unique=unique, default=default
+        )
+        self.properties = "({}) {}".format(max_length, self.properties)
+
+    @staticmethod
+    def convert(value):
+        return str(value)
