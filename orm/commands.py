@@ -47,6 +47,7 @@ class Query:
         exclude_dict=None,
         delete=False,
     ):
+        breakpoint()
         self.__schema = schema
         self.__table_class = table_class
         self.__table_name = table_class.get_table_name()
@@ -90,6 +91,7 @@ class Query:
         return "table_{}".format(self.__proxy_name_count)
 
     def __create_where_query(self):
+        breakpoint()
         filter_query = ""
         if self.__or_filter_dict:
             filter_query = "( {} )".format(
@@ -124,6 +126,7 @@ class Query:
         self.__where_query = filter_query
 
     def __create_from_query(self):
+        breakpoint()
         proxy_name = self.__base_table_proxy
         if self.__delete:
             self.__from_query = "FROM {} AS {}".format(
@@ -139,6 +142,7 @@ class Query:
             )
 
     def __logical_conditions(self, key, value, condition, table_proxy_name=None):
+        breakpoint()
         if not table_proxy_name:
             table_proxy_name = self.__base_table_proxy
         if key == "pk":
@@ -191,6 +195,7 @@ class Query:
         )
 
     def __change_to_sql_conditions(self, key, value):
+        breakpoint()
         # TODO: Tasks pending completion -@charles-PC at 5/7/2022, 6:52:12 PM
         # Add Foreign key field condition
 
@@ -220,6 +225,7 @@ class Query:
         self.__create_order_by_query()
 
         query = self.__from_query + self.__where_query + self.__order_by_query
+        breakpoint()
         return (
             self.__base_query.format(query),
             self.__params,

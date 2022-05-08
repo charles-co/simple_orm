@@ -1,8 +1,9 @@
 import inspect
 from collections import OrderedDict
+from copy import deepcopy
 
 from orm.commands import LOGICAL_SEPARATOR, SQL, Query
-from orm.fields import BaseField
+from orm.fields import BaseField, ForeignKeyField
 from orm.postgres import PostgreSQL
 
 
@@ -36,7 +37,10 @@ class RowSet:
             "exclude": {},
             "order_by": {},
         }
+        self.__limit = None
+        self.__offset = None
         self.__delete = False
+        self.__select_related = []
         self.__columns_order = []
         self.__value = None
         self.__table_details = None
@@ -81,6 +85,9 @@ class RowSet:
             filter_dict=self.__filter_exclude_inputs["filter"],
             or_filter_dict=self.__filter_exclude_inputs["or_filter"],
             exclude_dict=self.__filter_exclude_inputs["exclude"],
+            select_related=self.__select_related,
+            limit=self.__limit,
+            offset=self.__offset,
             delete=self.__delete,
         )
         (
@@ -95,6 +102,7 @@ class RowSet:
 
     def __set_attributes(self, column_values):
         data_map = {}
+        used_proxies = []
         for i in range(len(column_values)):
             p, c = self.__columns_order[i].split(".")
             if p not in data_map:
@@ -104,12 +112,44 @@ class RowSet:
             sorted([(k, v) for k, v in data_map.items()], key=lambda x: x[0])
         )
 
+        def get_table_proxy(tbl_class, base_tbl_class, f_key):
+            for proxy_k, proxy_v in self.__table_details.items():
+                conditions = (
+                    proxy_v["details"]["fk_table_class"] == tbl_class
+                    and proxy_v["details"]["base_table_class"] == base_tbl_class
+                    and proxy_v["details"]["key"] == f_key
+                )
+                if conditions and proxy_k not in used_proxies:
+                    used_proxies.append(proxy_k)
+                    return proxy_k
+            return
+
         def fill_table_attributes(proxy_name):
             if proxy_name == self.__base_table_proxy:
                 table_class = self.__table_class
+            else:
+                table_class = self.__table_details[proxy_name]["details"][
+                    "fk_table_class"
+                ]
             obj = table_class()
             for column in table_class.get_column_names():
-                setattr(obj, column, data_map[proxy_name][column])
+                if isinstance(table_class.__dict__[column], ForeignKeyField):
+                    obj_fk_table_class = getattr(
+                        table_class.__dict__[column], "table_name"
+                    )
+                    fk_proxy = get_table_proxy(
+                        tbl_class=obj_fk_table_class,
+                        base_tbl_class=table_class,
+                        f_key=column,
+                    )
+                    if fk_proxy:
+                        setattr(obj, column, fill_table_attributes(fk_proxy))
+                    else:
+                        obj_f_key = deepcopy(table_class.__dict__[column])
+                        obj_f_key.set_value(data_map[proxy_name][column])
+                        setattr(obj, column, obj_f_key)
+                else:
+                    setattr(obj, column, data_map[proxy_name][column])
             return obj
 
         main_obj = fill_table_attributes(proxy_name=self.__base_table_proxy)
@@ -124,6 +164,7 @@ class RowSet:
             start = int(index.start) if index.start else 0
             if start < 0:
                 raise ValueError("Start index cannot be negative.")
+            self.__offset = start
 
             stop = int(index.stop) if index.stop else None
             if stop:
@@ -131,10 +172,13 @@ class RowSet:
                     raise ValueError(
                         "Stop index cannot be negative and less than Start index."
                     )
+                self.__limit = stop - start
             return self.__iter__()
         if isinstance(index, int):
             if index < 0:
                 raise ValueError("Index cannot be negative.")
+            self.__limit = 1
+            self.__offset = index
             return [i for i in self.__iter__()][0]
         raise ValueError("Invalid index.")
 
@@ -350,11 +394,9 @@ class Table:
 
     @classmethod
     def get_value_or_object_pk(cls, value):
-        breakpoint()
         return getattr(value, "pk") if hasattr(value, "pk") else value
 
     def __get_field_value(self, field_name):
-        breakpoint()
         field_name = field_name.strip('"')
         value = getattr(self, field_name)
         return self.__class__.get_value_or_object_pk(value)
@@ -388,7 +430,6 @@ class Table:
                 return k
 
     def _sql_save(self, commit=True):
-        breakpoint()
         if getattr(self, "pk"):
             pk_name = self.__class__.get_pk_name()
             column_names = [

@@ -111,3 +111,32 @@ class CharField(Field):
     @staticmethod
     def convert(value):
         return str(value)
+
+
+class ForeignKeyField(Field):
+    def __init__(self, table_name, verbose_name=None, null=False, unique=False):
+        pk = table_name.get_pk_name()
+        self.table_name = table_name
+        self.field = table_name.__dict__[pk]
+        extra_sql = "REFERENCES {schema}.{table_name}({pk})".format(
+            schema=table_name.get_schema(),
+            table_name=table_name.get_table_name(),
+            pk=pk,
+        )
+        self.field_type = (
+            "INTEGER" if self.field.field_type == "SERIAL" else self.field.field_type
+        )
+        super().__init__(
+            verbose_name=verbose_name, null=null, unique=unique, extra_sql=(extra_sql,)
+        )
+
+    def __getattribute__(self, item):
+        try:
+            return object.__getattribute__(self, item)
+        except AttributeError:
+            return getattr(
+                self.__dict__["table_name"].objects.get(
+                    pk=self.__dict__["_Field__value"]
+                ),
+                item,
+            )
