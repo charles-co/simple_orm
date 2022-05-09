@@ -4,7 +4,7 @@
 
     pip install -r requirements.txt
 
-> Create `.env` file for connecting to PostgreSQL Database
+> Create `.env` file for connecting to PostgreSQL Database and run `source .env` see `.sample.env`
 
 - [ ] DB_HOST
 - [ ] DB_PORT
