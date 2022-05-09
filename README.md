@@ -26,3 +26,9 @@
 - [x] Handle foreign keys. (Relational DB)
 - [ ] Automatically detects schema changes (migrations)
 - [ ] Be used across multiple threads without causing unnecessary blocking
+
+
+## To Run
+
+- Create tables (like in examples directory) & migrate
+- Then you can query table using the `objects` Manager i.e `Users.objects.filter(name="test")` etc.
