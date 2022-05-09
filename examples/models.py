@@ -12,5 +12,22 @@ class User(Table):
     married = BooleanField(default=False)
 
 
-Query("public", User, ["name"], "id").query()
+class Car(Table):
+
+    id = DefaultPrimaryKeyField()
+    owner = ForeignKeyField(User)
+    name = CharField(max_length=255, null=True)
+    automatic = BooleanField(default=False)
+
+
+car = Car.objects.filter(owner__name="onoze")
+car[0].name
+print("-" * 50)
+car[0].owner
+print("-" * 50)
+
+
+car[0].owner.username
+print("-" * 50)
+
 breakpoint()

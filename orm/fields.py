@@ -2,7 +2,13 @@ from copy import deepcopy
 
 from orm.commands import SQL
 
-__all__ = ["BooleanField", "IntegerField", "DefaultPrimaryKeyField", "CharField"]
+__all__ = [
+    "BooleanField",
+    "IntegerField",
+    "DefaultPrimaryKeyField",
+    "CharField",
+    "ForeignKeyField",
+]
 
 
 class BaseField:
@@ -134,6 +140,7 @@ class ForeignKeyField(Field):
         try:
             return object.__getattribute__(self, item)
         except AttributeError:
+            breakpoint()
             return getattr(
                 self.__dict__["table_name"].objects.get(
                     pk=self.__dict__["_Field__value"]
