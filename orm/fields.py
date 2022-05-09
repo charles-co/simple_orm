@@ -140,7 +140,6 @@ class ForeignKeyField(Field):
         try:
             return object.__getattribute__(self, item)
         except AttributeError:
-            breakpoint()
             return getattr(
                 self.__dict__["table_name"].objects.get(
                     pk=self.__dict__["_Field__value"]

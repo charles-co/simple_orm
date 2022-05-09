@@ -107,59 +107,41 @@ class Query:
         self.__proxy_name_count += 1
         return "table_{}".format(self.__proxy_name_count)
 
-    def __create_where_query(self):
-        breakpoint()
-        filter_query = ""
-        if self.__or_filter_dict:
-            filter_query = "( {} )".format(
-                " OR ".join(
-                    [
-                        self.__change_to_sql_conditions(k, v)
-                        for k, v in self.__or_filter_dict.items()
-                    ]
-                )
-            )
-        if self.__filter_dict:
-            if filter_query:
-                filter_query += " AND "
-            filter_query += " AND ".join(
-                [
-                    self.__change_to_sql_conditions(k, v)
-                    for k, v in self.__filter_dict.items()
-                ]
-            )
-        if self.__exclude_dict:
-            if filter_query:
-                filter_query += " AND "
-            filter_query += "NOT "
-            filter_query += " AND NOT ".join(
-                [
-                    self.__change_to_sql_conditions(k, v)
-                    for k, v in self.__exclude_dict.items()
-                ]
-            )
-        if filter_query:
-            filter_query = " WHERE {}".format(filter_query)
-        self.__where_query = filter_query
-
-    def __create_from_query(self):
-        breakpoint()
-        proxy_name = self.__base_table_proxy
-        if self.__delete:
-            self.__from_query = "FROM {} AS {}".format(
-                self.__full_table_name, proxy_name
-            )
+    def __update_join_tables_involved(
+        self,
+        base_table_class,
+        fk_table_class,
+        key,
+        avoid_duplicates=False,
+        last_proxy=None,
+    ):
+        last_proxy = last_proxy if last_proxy else self.__base_table_proxy
+        join_data = {
+            "parent_proxy": last_proxy,
+            "details": {
+                "fk_table_name": "{}".format(fk_table_class.get_full_table_name()),
+                "base_table_name": "{}".format(base_table_class.get_full_table_name()),
+                "key": key,
+                "fk_table_pk": fk_table_class.get_pk_name(),
+                "fk_columns": fk_table_class.get_column_names(),
+                "fk_table_class": fk_table_class,
+                "base_table_class": base_table_class,
+            },
+        }
+        fk_details_key = (
+            join_data["details"]["fk_table_name"],
+            join_data["details"]["base_table_name"],
+            key,
+        )
+        if avoid_duplicates and fk_details_key in self.__join_tables_involved:
+            return self.__join_tables_involved[fk_details_key]
         else:
-            self.__column_query = ", ".join(
-                ["{}.{}".format(proxy_name, i) for i in self.__table_columns]
-            )
-            self.__from_query = "{} FROM {}".format(
-                self.__column_query,
-                "{} AS {}".format(self.__full_table_name, proxy_name),
-            )
+            proxy = self.generate_table_name_proxy()
+            self.__table_details[proxy] = join_data
+            self.__join_tables_involved[fk_details_key] = proxy
+            return proxy
 
     def __logical_conditions(self, key, value, condition, table_proxy_name=None):
-        breakpoint()
         if not table_proxy_name:
             table_proxy_name = self.__base_table_proxy
         if key == "pk":
@@ -174,7 +156,8 @@ class Query:
                 return "{key} {operation} ANY(%s)".format(
                     key=key, operation=self.__operators[condition]
                 )
-            raise InvalidQueryException("Value should be a list.")
+            else:
+                raise InvalidQueryException("Value should be a list.")
         if condition == "isnull":
             base = "{key} {operation}".format(
                 key=key, operation=self.__operators[condition]
@@ -205,14 +188,12 @@ class Query:
                 operation=self.__operators[condition],
             )
         self.__params.append(value)
-
         return "{key}{operation}%s".format(
             key=key,
             operation=self.__operators[condition],
         )
 
     def __change_to_sql_conditions(self, key, value):
-        breakpoint()
         key_splits = key.split(LOGICAL_SEPARATOR)
         if len(key_splits) == 1:
             return self.__logical_conditions(
@@ -249,57 +230,41 @@ class Query:
                 key=key, value=value, condition=condition, table_proxy_name=proxy
             )
 
-    def __create_order_by_query(self):
-        order_query = ""
-        if not self.__delete:
-            if self.__order_dict:
-                order_query = ", ".join(
+    def __create_where_query(self):
+        filter_query = ""
+        if self.__or_filter_dict:
+            filter_query = "( {} )".format(
+                " OR ".join(
                     [
-                        "{}.{} {}".format(self.__base_table_proxy, k, v)
-                        for k, v in self.__order_dict.items()
+                        self.__change_to_sql_conditions(k, v)
+                        for k, v in self.__or_filter_dict.items()
                     ]
                 )
-            if order_query:
-                order_query = " ORDER BY {}".format(order_query)
-        self.__order_by_query = order_query
-
-    def __update_join_tables_involved(
-        self,
-        base_table_class,
-        fk_table_class,
-        key,
-        avoid_duplicates=False,
-        last_proxy=None,
-    ):
-        breakpoint()
-        last_proxy = last_proxy if last_proxy else self.__base_table_proxy
-        join_data = {
-            "parent_proxy": last_proxy,
-            "details": {
-                "fk_table_name": "{}".format(fk_table_class.get_full_table_name()),
-                "base_table_name": "{}".format(base_table_class.get_full_table_name()),
-                "key": key,
-                "fk_table_pk": fk_table_class.get_pk_name(),
-                "fk_columns": fk_table_class.get_column_names(),
-                "fk_table_class": fk_table_class,
-                "base_table_class": base_table_class,
-            },
-        }
-        fk_details_key = (
-            join_data["details"]["fk_table_name"],
-            join_data["details"]["base_table_name"],
-            key,
-        )
-        if avoid_duplicates and fk_details_key in self.__join_tables_involved:
-            return self.__join_tables_involved[fk_details_key]
-        else:
-            proxy = self.generate_table_name_proxy()
-            self.__table_details[proxy] = join_data
-            self.__join_tables_involved[fk_details_key] = proxy
-            return proxy
+            )
+        if self.__filter_dict:
+            if filter_query:
+                filter_query += " AND "
+            filter_query += " AND ".join(
+                [
+                    self.__change_to_sql_conditions(k, v)
+                    for k, v in self.__filter_dict.items()
+                ]
+            )
+        if self.__exclude_dict:
+            if filter_query:
+                filter_query += " AND "
+            filter_query += "NOT "
+            filter_query += " AND NOT ".join(
+                [
+                    self.__change_to_sql_conditions(k, v)
+                    for k, v in self.__exclude_dict.items()
+                ]
+            )
+        if filter_query:
+            filter_query = " WHERE {}".format(filter_query)
+        self.__where_query = filter_query
 
     def __process_select_related(self):
-        breakpoint()
         for fk_item in set(self.__select_related):
             proxy = None
             parent_class = self.__table_class
@@ -315,7 +280,6 @@ class Query:
                 parent_class = fk_table_class
 
     def __switch_to_join_query(self):
-        breakpoint()
         if self.__delete:
             from_query = "FROM {} AS {} USING ".format(
                 self.__full_table_name, self.__base_table_proxy
@@ -358,8 +322,39 @@ class Query:
                 join_query,
             )
 
+    def __create_from_query(self):
+        if self.__join_tables_involved:
+            self.__switch_to_join_query()
+        else:
+            proxy_name = self.__base_table_proxy
+            if self.__delete:
+                self.__from_query = "FROM {} AS {}".format(
+                    self.__full_table_name, proxy_name
+                )
+            else:
+                self.__column_query = ", ".join(
+                    ["{}.{}".format(proxy_name, i) for i in self.__table_columns]
+                )
+                self.__from_query = "{} FROM {}".format(
+                    self.__column_query,
+                    "{} AS {}".format(self.__full_table_name, proxy_name),
+                )
+
+    def __create_order_by_query(self):
+        order_query = ""
+        if not self.__delete:
+            if self.__order_dict:
+                order_query = ", ".join(
+                    [
+                        "{}.{} {}".format(self.__base_table_proxy, k, v)
+                        for k, v in self.__order_dict.items()
+                    ]
+                )
+            if order_query:
+                order_query = " ORDER BY {}".format(order_query)
+        self.__order_by_query = order_query
+
     def __create_limit_offset_query(self):
-        breakpoint()
         query = ""
         if self.__limit is not None:
             query += " LIMIT {}".format(self.__limit)

@@ -98,11 +98,11 @@ class RowSet:
             self.__base_table_proxy,
         ) = query.query()
         self.__columns_order = [i.strip().strip('n"') for i in column_query.split(",")]
-        breakpoint()
+
         return {"query": sql_query, "params": params}
 
     def __set_attributes(self, column_values):
-        breakpoint()
+
         data_map = {}
         used_proxies = []
         for i in range(len(column_values)):
@@ -115,7 +115,7 @@ class RowSet:
         )
 
         def get_table_proxy(tbl_class, base_tbl_class, f_key):
-            breakpoint()
+
             for proxy_k, proxy_v in self.__table_details.items():
                 conditions = (
                     proxy_v["details"]["fk_table_class"] == tbl_class
@@ -128,7 +128,7 @@ class RowSet:
             return
 
         def fill_table_attributes(proxy_name):
-            breakpoint()
+
             if proxy_name == self.__base_table_proxy:
                 table_class = self.__table_class
             else:
@@ -160,7 +160,7 @@ class RowSet:
         return main_obj
 
     def __getitem__(self, index):
-        breakpoint()
+
         if isinstance(index, slice):
             if index.step:
                 print(
@@ -193,7 +193,7 @@ class RowSet:
                 obj = self.__set_attributes(i)
                 yield obj
         else:
-            breakpoint()
+
             for i in self.__value:
                 yield i
 
